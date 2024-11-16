@@ -20,14 +20,34 @@
           inherit system;
           modules = [
             (
-              { modulesPath, ... }:
+              { pkgs, modulesPath, ... }:
               {
                 imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
                 console.keyMap = "de_CH-latin1";
                 services.openssh.settings = {
-                  PermitRootLogin = "yes";
-                  PermitEmptyPasswords = "yes";
+                  PermitRootLogin = lib.mkForce "prohibit-password";
+                  PasswordAuthentication = false;
+                  PubkeyAuthentication = true;
                 };
+                users.users = lib.listToAttrs (
+                  map
+                    (name: {
+                      inherit name;
+                      value = {
+                        # nixos
+                        hashedPassword = "$y$j9T$KEl2fuMvRTfDRdsCfEfEE/$7llFW7YP6XEPvJu4yxiJUD9WPI6RsI8.wd3oowNA1/6";
+                        initialHashedPassword = lib.mkForce null;
+                        openssh.authorizedKeys.keys = lib.mapAttrsToList (n: v: builtins.readFile ./keys/${n}) (
+                          lib.filterAttrs (n: v: v == "regular" && !(lib.hasPrefix "." n)) (builtins.readDir ./keys)
+                        );
+                      };
+                    })
+                    [
+                      "nixos"
+                      "root"
+                    ]
+                );
+                # environment.systemPackages = [ pkgs.gitMinimal ];
               }
             )
           ];
