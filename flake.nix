@@ -1,10 +1,20 @@
 {
   description = "Custom NixOS ISO image for deployments with nixos-anywhere";
 
-  inputs.nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    disko = {
+      url = "github:nix-community/disko/latest";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { self, nixpkgs }:
+    {
+      self,
+      nixpkgs,
+      disko,
+    }:
     let
       systems = [
         "i686-linux"
@@ -24,6 +34,10 @@
               {
                 imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
                 console.keyMap = "de_CH-latin1";
+                nix.settings.extra-experimental-features = [
+                  "nix-command"
+                  "flakes"
+                ];
                 services.openssh.settings = {
                   PermitRootLogin = lib.mkForce "prohibit-password";
                   PasswordAuthentication = false;
@@ -37,7 +51,7 @@
                         # nixos
                         hashedPassword = "$y$j9T$KEl2fuMvRTfDRdsCfEfEE/$7llFW7YP6XEPvJu4yxiJUD9WPI6RsI8.wd3oowNA1/6";
                         initialHashedPassword = lib.mkForce null;
-                        openssh.authorizedKeys.keys = lib.mapAttrsToList (n: v: builtins.readFile ./keys/${n}) (
+                        openssh.authorizedKeys.keys = lib.mapAttrsToList (n: _: builtins.readFile ./keys/${n}) (
                           lib.filterAttrs (n: v: v == "regular" && !(lib.hasPrefix "." n)) (builtins.readDir ./keys)
                         );
                       };
@@ -47,13 +61,16 @@
                       "root"
                     ]
                 );
-                # environment.systemPackages = [ pkgs.gitMinimal ];
+                environment.systemPackages = [
+                  pkgs.gitMinimal
+                  disko.packages.${system}.disko-install
+                ];
               }
             )
           ];
         }
       );
-      apps = lib.mapAttrs (system: v: rec {
+      apps = lib.mapAttrs (system: _: rec {
         build-iso = {
           type = "app";
           program = "${nixpkgs.legacyPackages.${system}.writeShellScript "build-iso-for-${system}"
